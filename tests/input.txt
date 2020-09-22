@@ -1,0 +1,20 @@
+call 1
+answer A
+hangup 1
+call 2
+call 3
+answer A
+answer B
+call 4
+call 5
+hangup 3
+hangup 2
+answer B
+reject A
+call 6
+hangup 5
+call 7
+hangup 7
+hangup 6
+hangup 4
+exit

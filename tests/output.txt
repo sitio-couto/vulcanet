@@ -1,0 +1,31 @@
+You are connected to the call center.
+Call 1 received
+Call 1 ringing for operator A
+Call 1 answered by operator A
+Call 1 finished and operator A available
+Call 2 received
+Call 2 ringing for operator A
+Call 3 received
+Call 3 ringing for operator B
+Call 2 answered by operator A
+Call 3 answered by operator B
+Call 4 received
+Call 4 waiting in queue
+Call 5 received
+Call 5 waiting in queue
+Call 3 finished and operator B available
+Call 4 ringing for operator B
+Call 2 finished and operator A available
+Call 5 ringing for operator A
+Call 4 answered by operator B
+Call 5 rejected by operator A
+Call 5 ringing for operator A
+Call 6 received
+Call 6 waiting in queue
+Call 5 missed
+Call 6 ringing for operator A
+Call 7 received
+Call 7 waiting in queue
+Call 7 missed
+Call 6 missed
+Call 4 finished and operator B available

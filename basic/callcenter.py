@@ -1,6 +1,7 @@
 from enum import Enum
 from cmd import Cmd
 from collections import deque
+import sys
 
 class Operator():
     # These states are limited to the operator class
@@ -19,7 +20,7 @@ class Operator():
         return False
 
     def hangup(self):
-        if self.is_busy():
+        if self.is_busy() or self.is_ringing():
             self.state = Operator.States.AVAILABLE
             self.call = None
             return True
@@ -116,9 +117,12 @@ class CallManager():
             print(f"Call {call} missed")
         else:
             op = self.operators.search_call(call)
-            if op : 
+            if op:
+                if op.is_busy():
+                    print(f"Call {call} finished and operator {op.id} available")
+                elif op.is_ringing():
+                    print(f"Call {call} missed")
                 op.hangup()
-                print(f"Call {call} finished and operator {op.id} available")
             if self.queue.not_empty() : self.do_call()
 
 class CmdInterface(Cmd):
@@ -146,4 +150,6 @@ class CmdInterface(Cmd):
 operators = [Operator("A"), Operator("B")]
 manager = CallManager(operators)
 interface = CmdInterface(manager)
-interface.cmdloop("You are connected to the call center.")
+
+if __name__ == "__main__":
+    interface.cmdloop("You are connected to the call center.")
