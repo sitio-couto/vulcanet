@@ -174,7 +174,7 @@ class CallCenterProtocol(protocol.Protocol):
     def checkTimeout(self, call_id):
         '''Function for setting up countdown-based callbacks'''
         msg = self.factory.manager.do_timeout(call_id)
-        self.transport.write(self.jsonfy(msg))
+        if msg : self.transport.write(self.jsonfy(msg))
 
     def dataReceived(self, data):
         '''Process command received from client.'''

@@ -11,7 +11,7 @@ class Client(basic.LineReceiver):
     '''Implements methods for communicating with the server.'''
     
     def connectionMade(self):
-        print("You are connected to the call center.")
+        print("You are connected to the call center. \n>> ", end="")
         stdio.StandardIO(UserInterface(CmdInterface(self))) # Initialize stdin input protocol
         
     def sendCommand(self, message):
@@ -22,6 +22,9 @@ class Client(basic.LineReceiver):
         "Exhibit server's reply."
         print(json.loads(data)['response'], "\n>> ", end="")
     
+    def disconnect(self):
+        self.transport.loseConnection()
+
     def connectionLost(self, reason):
         print("\nConnection lost.")
 
