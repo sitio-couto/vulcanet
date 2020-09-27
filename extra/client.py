@@ -3,22 +3,22 @@
 # See LICENSE for details.
 import json, inspect
 from cmd import Cmd
-from twisted.internet import reactor, protocol, threads, defer
+from twisted.internet import reactor, protocol, threads, stdio
+from twisted.protocols import basic
 from twisted.web.client import Agent
 from twisted.web.error import Error
+from os import linesep
 from twisted.python import threadable
 threadable.init()
 
 # a client protocol
 
-class EchoClient(protocol.Protocol):
+class EchoClient(basic.LineReceiver):
     """Once connected, send a message, then print the result."""
     
     def connectionMade(self):
         print("You are connected to the call center.")
-        # Call cmdloop after connection was stabilished, otherwise the 
-        # transport attribute might be None(= "no connection")
-        reactor.callInThread(CmdInterface(self).cmdloop)
+        stdio.StandardIO(UserInterface(CmdInterface(self)))
         
     def sendCommand(self, message):
         "Send command to call center server."
@@ -26,7 +26,7 @@ class EchoClient(protocol.Protocol):
 
     def dataReceived(self, data):
         "Exhibit server's reply and enable cmd."
-        print(json.loads(data)['response'])
+        print(json.loads(data)['response'], "\n>> ", end="")
     
     def connectionLost(self, reason):
         print("\nConnection lost.")
@@ -49,7 +49,6 @@ class CmdInterface(Cmd):
     def __init__(self, agent):
         Cmd.__init__(self)
         self.agent = agent
-        self.wait = False
 
     # Auxiliary Functions
 
@@ -61,18 +60,8 @@ class CmdInterface(Cmd):
 
     def eventLaucher(self, msg):
         '''Request event from thread and print result.'''
-        try:
-            threads.blockingCallFromThread(
-                reactor, self.agent.sendCommand, msg)
-        except Error as exc:
-            print(exc)
-    
-    def disconnect(self):
-        try:
-            threads.blockingCallFromThread(
-                reactor, self.agent.disconnect)
-        except Error as exc:
-            print(exc)
+        try: self.agent.sendCommand(msg)
+        except Error as exc: print(exc)
 
     # List of Available Commands
 
@@ -88,11 +77,21 @@ class CmdInterface(Cmd):
     # Terminator Functions
 
     def do_exit(self, args):
-        self.disconnect()
+        self.agent.disconnect()
         return True
     def do_EOF(self, args):
-        self.disconnect()
+        self.agent.disconnect()
         return True
+
+class UserInterface(basic.LineReceiver):
+    '''Creates a protocol with stdin for in-line commands.'''
+    delimiter = linesep.encode("ascii")
+
+    def __init__(self, cmd):
+        self.cmd = cmd
+
+    def lineReceived(self, line):
+        self.cmd.onecmd(line.decode('utf-8'))
 
 # this connects the protocol to a server running on port 8000
 def main():

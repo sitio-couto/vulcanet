@@ -11,6 +11,7 @@ class Operator():
         self.id = id
         self.state = Operator.States.AVAILABLE
         self.call = None
+        self.timeout_id = None
 
     def ring(self, call):
         if self.is_available():
@@ -82,14 +83,16 @@ class CallManager():
         self.protocol = None
         self.queue = Queue() 
 
-    def setTimeout(self, call_id):
-        reactor.callLater(10, self.protocol.checkTimeout, call_id)
+    def set_timeout(self, call_id, op):
+        op.timeout_id = reactor.callLater(
+            10, self.protocol.checkTimeout, call_id)
 
     def checkTimeout(self, call_id, msg=""):
         operator = self.operators.search_call(call_id)
         if operator and operator.is_ringing():
-            msg += f"\nCall {operator.call} ignored by operator {operator.id}"
+            msg += f"Call {operator.call} ignored by operator {operator.id}"
             operator.hangup()
+            if self.queue.not_empty() : msg += f"\n{self.do_call(None)}"
         return msg
 
     def do_call(self, call, msg=""):
@@ -104,7 +107,7 @@ class CallManager():
         operator = self.operators.ring_operators(call)
         if operator:
             msg += f"Call {call} ringing for operator {operator.id}"
-            self.setTimeout(call)
+            self.set_timeout(call, operator)
         else:
             self.queue.hold(call)
             msg += f"Call {call} waiting in queue"
@@ -119,6 +122,7 @@ class CallManager():
 
     def do_reject(self, op_id, msg=""):
         operator = self.operators.get(op_id)
+        operator.timeout_id.cancel() # Cancel timeout callback
         call = operator.reject()
         msg += f"Call {call} rejected by operator {op_id}\n"
         self.queue.first(call) # Return rejected call to the front of the queue
