@@ -190,7 +190,10 @@ class CallCenterFactory(protocol.ServerFactory):
     def buildProtocol(self, data):
         return CallCenterProtocol(self)
 
-if __name__ == '__main__':
+def main():
     factory = CallCenterFactory()
     reactor.listenTCP(5678, factory)
     reactor.run()
+
+if __name__ == '__main__':
+    main()
