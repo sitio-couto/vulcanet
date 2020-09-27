@@ -4,14 +4,16 @@ from collections import deque
 from twisted.internet import reactor, protocol
 
 class Operator():
-    # These states are limited to the operator class
+    '''Implements individual Operator actions and states.'''
     States = Enum("state", "AVAILABLE RINGING BUSY")
     
     def __init__(self, id):
         self.id = id
         self.state = Operator.States.AVAILABLE
-        self.call = None
-        self.timeout_id = None
+        self.call       = None # ID of the current assingned call
+        self.timeout_id = None # Reference to timeout callback when ringing
+
+    # State Transition Fuctions
 
     def ring(self, call):
         if self.is_available():
@@ -41,8 +43,8 @@ class Operator():
             return True
         return False
 
-    def set_state(self, state):
-        self.state = Operator.States[state]
+    # State Evaluation Functions
+
     def is_available(self):
         return self.state == Operator.States.AVAILABLE
     def is_ringing(self):
@@ -51,16 +53,18 @@ class Operator():
         return self.state == Operator.States.BUSY
 
 class Operators():
+    '''Implements methods for a set of operators.'''
     def __init__(self, operators):
         self.operators = {op.id:op for op in operators}
 
     def ring_operators(self, call):
-        # Try calling Operators, if none available, put on hold (end of queue)
+        '''Attempt to call operators and assign/hold a call.'''
         for op in self.operators.values():
             if op.ring(call) : return op
         return None
     
     def search_call(self, call):
+        '''Return if an Operator has <call> assigned to it.'''
         for op in self.operators.values():
             if op.call == call : return op
         return None
@@ -69,6 +73,7 @@ class Operators():
         return self.operators.get(op_id, None)
 
 class Queue():
+    ''''Wrapper for collections.deque Class.'''
     def __init__(self)     : self.queue = deque()
     def hold(self, call)   : self.queue.appendleft(call)
     def next(self)         : return self.queue.pop()
@@ -78,16 +83,19 @@ class Queue():
     def first(self, call)  : self.queue.append(call)
 
 class CallManager():
+    '''Coordinate call-operator assignments and responses to client side.'''
     def __init__(self, operators):
-        self.operators = Operators(operators)
-        self.protocol = None
-        self.queue = Queue() 
+        self.operators = Operators(operators) # Working Operators
+        self.protocol = None # Reference to client communication protocol
+        self.queue = Queue() # Calls pool
 
     def set_timeout(self, call_id, op):
+        '''Register count-down based call back to terminate call.'''
         op.timeout_id = reactor.callLater(
             10, self.protocol.checkTimeout, call_id)
 
-    def checkTimeout(self, call_id, msg=""):
+    def do_timeout(self, call_id, msg=""):
+        '''Terminate call if it has been ringing for more than 10s.'''
         operator = self.operators.search_call(call_id)
         if operator and operator.is_ringing():
             msg += f"Call {operator.call} ignored by operator {operator.id}"
@@ -96,6 +104,7 @@ class CallManager():
         return msg
 
     def do_call(self, call, msg=""):
+        '''Initiate, unqueue or queue a call.'''
         # Check if it's a new or queue call
         if call:
             call = int(call)
@@ -115,12 +124,14 @@ class CallManager():
         return msg
             
     def do_answer(self, op_id, msg=""):
+        '''Answer ringing call for Operator <op_id>.'''
         operator = self.operators.get(op_id)
         if operator.answer():
             msg += f"Call {operator.call} answered by operator {op_id}"
         return msg
 
     def do_reject(self, op_id, msg=""):
+        '''Reject ringing call for Operator <op_id>.'''
         operator = self.operators.get(op_id)
         operator.timeout_id.cancel() # Cancel timeout callback
         call = operator.reject()
@@ -130,6 +141,7 @@ class CallManager():
         return msg
 
     def do_hangup(self, call, msg=""):
+        '''Hangup ongoing of queued call <call>.'''
         call = int(call)
         # Check if call is either on queue or with an operator and end it
         if self.queue.has(call):
@@ -148,7 +160,7 @@ class CallManager():
         return msg
 
 class CallCenterProtocol(protocol.Protocol):
-    '''Executes client requests and send responses.'''
+    '''Implements interface between the CallManager and the Client.'''
 
     def __init__(self, factory):
         self.factory = factory
@@ -160,14 +172,14 @@ class CallCenterProtocol(protocol.Protocol):
         return json_str.encode('utf-8')
 
     def checkTimeout(self, call_id):
-        '''Function for countdown-based callbacks'''
-        msg = self.factory.manager.checkTimeout(call_id)
+        '''Function for setting up countdown-based callbacks'''
+        msg = self.factory.manager.do_timeout(call_id)
         self.transport.write(self.jsonfy(msg))
 
     def dataReceived(self, data):
         '''Process command received from client.'''
         data = json.loads(data)
-        method = getattr(self.factory.manager, "do_"+data['command'])
+        method = getattr(self.factory.manager, "do_"+data['command']) # retrive method addr
         msg = method(data['args'])
         self.transport.write(self.jsonfy(msg))
 

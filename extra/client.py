@@ -1,41 +1,33 @@
-
-# Copyright (c) Twisted Matrix Laboratories.
-# See LICENSE for details.
 import json, inspect
 from cmd import Cmd
-from twisted.internet import reactor, protocol, threads, stdio
-from twisted.protocols import basic
-from twisted.web.client import Agent
-from twisted.web.error import Error
 from os import linesep
-from twisted.python import threadable
-threadable.init()
+from twisted.protocols import basic
+from twisted.web.error import Error
+from twisted.internet import reactor, protocol, threads, stdio
 
 # a client protocol
 
-class EchoClient(basic.LineReceiver):
-    """Once connected, send a message, then print the result."""
+class Client(basic.LineReceiver):
+    '''Implements methods for communicating with the server.'''
     
     def connectionMade(self):
         print("You are connected to the call center.")
-        stdio.StandardIO(UserInterface(CmdInterface(self)))
+        stdio.StandardIO(UserInterface(CmdInterface(self))) # Initialize stdin input protocol
         
     def sendCommand(self, message):
         "Send command to call center server."
         self.transport.write(message)
 
     def dataReceived(self, data):
-        "Exhibit server's reply and enable cmd."
+        "Exhibit server's reply."
         print(json.loads(data)['response'], "\n>> ", end="")
     
     def connectionLost(self, reason):
         print("\nConnection lost.")
 
-    def disconnect(self):
-        reactor.callLater(0, self.transport.loseConnection)
-
-class EchoFactory(protocol.ClientFactory):
-    protocol = EchoClient
+class ClientFactory(protocol.ClientFactory):
+    '''Implements persistent aspects among connections.'''
+    protocol = Client
 
     def clientConnectionFailed(self, connector, reason):
         print("Connection failed!")
@@ -46,6 +38,8 @@ class EchoFactory(protocol.ClientFactory):
         reactor.stop()
 
 class CmdInterface(Cmd):
+    '''Implements communication between commands and the Client.'''
+
     def __init__(self, agent):
         Cmd.__init__(self)
         self.agent = agent
@@ -91,14 +85,14 @@ class UserInterface(basic.LineReceiver):
         self.cmd = cmd
 
     def lineReceived(self, line):
+        '''Read line and send it to CmdInterface for processing.'''
         self.cmd.onecmd(line.decode('utf-8'))
 
 # this connects the protocol to a server running on port 8000
 def main():
-    f = EchoFactory()
-    reactor.connectTCP("localhost", 5678, f)
+    f = ClientFactory()
+    reactor.connectTCP("localhost", 5678, f) # connect localhost:5678
     reactor.run()
 
-# this only runs if the module was *not* imported
 if __name__ == '__main__':
     main()
